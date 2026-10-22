@@ -135,7 +135,7 @@ class generate_prm_data:
         else:
             mode="binary_search"
             static_sample=True
-        print(f"搜索算法:{mode}\n")
+        print(f"Search algorithm:{mode}\n")
         llm_dir_list=["../llama3.1-8B-Instruct","../models/qwen2-7B-Instruct"]
         gpu_memory_utilization_list=[0.5,0.45]
         llm_list=[LLM(
@@ -172,7 +172,7 @@ class generate_prm_data:
                     total_sampled+=sample_num_n
                     total_sample_tokens+=generate_tokens
                     if sum(sloved_list)<=10:
-                        print(f"问题{i}跳过")
+                        print(f"Skip problem {i}, it is too short.")
                         continue
                     sloved_list=[0 for _ in range(len(generate_nodes))]
                     perplexity_list=[0 for _ in range(len(generate_nodes))]
@@ -222,7 +222,7 @@ class generate_prm_data:
                     with open(self.save_dir,"a") as file:
                         file.write(json.dumps(final_data) + '\n')
                         file.write(json.dumps({"total_sampled":total_sampled,"total_sample_tokens":total_sample_tokens,"use_time":finish_time-start_time}) + '\n')
-        print(f"搜索算法:{mode}, 共生成token数:{total_sample_tokens}, 共采样次数:{total_sampled}, 共用时:{finish_time-start_time}\n")
+        print(f"Search algorithm:{mode}, total number of generated tokens:{total_sample_tokens}, total number of samples:{total_sampled}, duration:{finish_time-start_time}\n")
 
 
     def find_error_step(self,final_data,left,right,step_node_list,llm_list,tokenizer_list,sample_num_n,history,final_sloved_perplexity_list):
