@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 import numpy as np
 from sympy import *
 from vllm import LLM, SamplingParams
@@ -6,7 +7,7 @@ import random
 from transformers import AutoTokenizer
 import json
 from tqdm import tqdm
-from mcts_math.agents.utils import math_is_equiv
+from mcts_math import math_is_equiv
 import argparse
 from utils import ag_step,extract_answer,get_model_name,get_prompt
 import time
