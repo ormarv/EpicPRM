@@ -66,7 +66,7 @@ def test_pass(test_case, func_str):
 
 
 
-def math_is_equiv(grt: Union[str, list[str]], prd: str, question: str):
+def math_is_equiv(grt: Union[str, list[str]], prd: str):
     # return True
     if isinstance(grt, list):
         for g in grt:

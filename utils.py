@@ -59,7 +59,7 @@ def remove_box(text):
                 break
         return text[start:end]
     else:
-        return "bad solution"
+        return text
 
 def remove_unit(text):
     unit=["calories","cm","customers","degrees","nickels","daps","gallons","^\circ","inches","seconds","cents","meters","beakers","inches/second","\u00b0","/second","cubic","feet"]
@@ -70,6 +70,7 @@ def remove_unit(text):
 
 def extract_answer(text):
     split_ans = text.split('The final answer is')
+    print(f"split_ans: {split_ans}")
     if len(split_ans) == 1 or split_ans[-1]=="":
         split_ans=text.split('the final answer is')
         if len(split_ans) == 1 or split_ans[-1]=="":

@@ -7,7 +7,7 @@ import random
 from transformers import AutoTokenizer
 import json
 from tqdm import tqdm
-from mcts_math import math_is_equiv
+from hendryck_cleanup import is_equiv
 import argparse
 from utils import ag_step,extract_answer,get_model_name,get_prompt
 import time
@@ -40,11 +40,13 @@ def eval_answer(pred_text,ground_truth):
     signal.signal(signal.SIGALRM, handler)
     signal.alarm(timeout_seconds)
     try:
+        print(f"Predicted text: {pred_text}")
         pred=extract_answer(pred_text)
+        print(f"Extracted prediction: {pred}")
         if pred=="bad_answer":
             return False
         # print(pred,"===============",ground_truth)
-        result = math_is_equiv(pred,ground_truth)
+        result = is_equiv(pred,ground_truth)
     except TimeoutError as exc:
         result = False
     finally:
@@ -141,7 +143,7 @@ class generate_prm_data:
         gpu_memory_utilization_list=[0.5,0.45]
         llm_list=[LLM(
                     model=llm_dir_list[i],
-                    tensor_parallel_size=1,
+                    tensor_parallel_size=4,
                     trust_remote_code=True,
                     gpu_memory_utilization=gpu_memory_utilization_list[i],
                     max_model_len=8192,
@@ -291,6 +293,7 @@ class generate_prm_data:
 
 
     def chose_solution(self,node_list,chose_num):
+        print(f"node_list: {node_list}")
         if len(node_list)<=chose_num:
             return node_list
         cosine_similarity_dict={}
@@ -331,7 +334,7 @@ class generate_prm_data:
         history=[]
         llm = LLM(
             model=self.model_dir,
-            tensor_parallel_size=1,
+            tensor_parallel_size=4,
             trust_remote_code=True,
             gpu_memory_utilization=0.8,
             max_model_len=8000,
@@ -346,20 +349,25 @@ class generate_prm_data:
             level_dict={1:0,2:0,3:500,4:1000,5:1000}
         ori_data_dict={}
         with open(self.data_dir,"r") as f:
+            print(f"Opened file {self.data_dir} in reading mode.")
             i=0
             for line in f:
-                if 5000<i<8000:
-                    item=json.loads(line)
-                    if level_dict[item["level"]]:
-                        data_list.append(item)
-                        level_dict[item["level"]]-=1
+                #if 5000<i<8000:
+                item=json.loads(line)
+                if level_dict[item["level"]]:
+                    data_list.append(item)
+                    level_dict[item["level"]]-=1
                 i+=1
         random.shuffle(data_list)
+        print(f"Data list: {data_list}")
         for indx,data in tqdm(enumerate(data_list),total=len(data_list),desc="Mian process"):
+            print(f"Index, data: {indx}, {data}")
+            print(f"start: {self.start}, indx: {indx}, end: {self.end}")
             if self.start<=indx<self.end:
                 if data["problem"] in ori_data_dict:
                     save_data=ori_data_dict[data["problem"]]
                     with open(self.save_dir,"a") as file:
+                        print(f"Opend file {self.data_dir}, printing {save_data}")
                         file.write(json.dumps(save_data) + '\n')
                     continue
                 t_solution_list,f_solution_list=[],[]
@@ -369,11 +377,14 @@ class generate_prm_data:
                 generate_prompt=get_prompt(question_node,history) if len(history)>1 else None
                 sample_num=min(2**(data["level"]+3),64)
                 solution_nodes=generate_numi_steps_test(question_node, tokenizer, llm, sample_num, -10, temperature=0.8, top_p=1,ori_prompt=generate_prompt,max_tokens=7000)
+                print(f"Solution nodes: {solution_nodes}")
                 for node in solution_nodes:
                     generate_answer=extract_answer(node.cur_step)
+                    print(f"Extracted answer: {generate_answer}")
+                    print(f"Gold standard: {question_node.ans}")
                     if generate_answer=="" or generate_answer=="bad_answer":
                         continue
-                    if math_is_equiv(generate_answer,question_node.ans):
+                    if is_equiv(generate_answer,question_node.ans):
                         node.final_value=1
                         sloved+=1
                         history.append({"instruction":f"Instruction:{node.question}\nResponse: Let’s think step by step.\n{node.previous_steps}","response":node.cur_step})
@@ -391,6 +402,7 @@ class generate_prm_data:
                 save_data[f"{generator_name}_sloved"]=sloved
                 save_data[f"{generator_name}_sample_num"]=sample_num
                 with open(self.save_dir,"a") as file:
+                    print(f"Opened file {self.save_dir}, printing {save_data}.")
                     file.write(json.dumps(save_data) + '\n')
         
 
