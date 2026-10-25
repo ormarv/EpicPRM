@@ -139,7 +139,7 @@ class generate_prm_data:
             mode="binary_search"
             static_sample=True
         print(f"Search algorithm:{mode}\n")
-        llm_dir_list=["../llama3.1-8B-Instruct","../models/qwen2-7B-Instruct"]
+        llm_dir_list=["../.cache/huggingface/hub/models--meta-llama--Llama-3.1-8B-Instruct/snapshots/0e9e39f249a16976918f6564b8830bc894c89659/","../.cache/huggingface/hub/models--Qwen--Qwen2.5-7B-Instruct/snapshots/a09a35458c702b33eeacc393d103063234e8bc28/"]
         gpu_memory_utilization_list=[0.5,0.45]
         llm_list=[LLM(
                     model=llm_dir_list[i],
@@ -276,7 +276,7 @@ class generate_prm_data:
         acc_list,acc_perplexity_list=[],[],[]
         return_nodes=[]
         for i in range(len(llm_list)):
-            generate_prompt = get_prompt(node,history) if len(history)>1 else None
+            generate_prompt = get_prompt(node,history, generator_name) if len(history)>1 else None
             generate_node=generate_numi_steps_test(node, tokenizer_list[i], llm_list[i], sample_num, -10, temperature=0.8, top_p=1,ori_prompt=generate_prompt,max_tokens=4000)
             acc,acc_prob_n,prob_sum_n,generate_tokens=0,0,0,0
             for gen_node in generate_node:
@@ -316,7 +316,7 @@ class generate_prm_data:
         return [node_list[id] for id in chose_id]
 
 
-    def cosine_similarity(node1,node2):
+    def cosine_similarity(self,node1,node2):
         array1 = np.array(node1.cur_step_tokens)
         array2 = np.array(node2.cur_step_tokens)
         min_len = min(len(array1), len(array2))
@@ -374,7 +374,7 @@ class generate_prm_data:
                 question_node=ag_step(question=data["problem"],ans=data["answer"])
                 save_data={"question":question_node.question,"ground_truth":question_node.ans,"level":data["level"],"solutions":[]}
                 sloved=0                
-                generate_prompt=get_prompt(question_node,history) if len(history)>1 else None
+                generate_prompt=get_prompt(question_node,history,generator_name) if len(history)>1 else None
                 sample_num=min(2**(data["level"]+3),64)
                 solution_nodes=generate_numi_steps_test(question_node, tokenizer, llm, sample_num, -10, temperature=0.8, top_p=1,ori_prompt=generate_prompt,max_tokens=7000)
                 print(f"Solution nodes: {solution_nodes}")

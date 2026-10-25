@@ -23,4 +23,4 @@ export LD_LIBRARY_PATH=/linkhome/rech/genltc01/ugy38tw/.local/lib/python3.12/sit
 
 chmod +x generate_train_data.py
 
-srun generate_train_data.py --data_dir test_data.jsonl --save_dir test_generated_data.jsonl --generate --model_dir "../.cache/huggingface/hub/models--deepseek-ai--DeepSeek-R1-Distill-Llama-70B/snapshots/b1c0b44b4369b597ad119a196caf79a9c40e141e/"
+srun generate_train_data.py --synthetic_data_dir test_generated_data.jsonl --get_label --use_adaptive_binary --model_dir "../.cache/huggingface/hub/models--deepseek-ai--DeepSeek-R1-Distill-Llama-70B/snapshots/b1c0b44b4369b597ad119a196caf79a9c40e141e/"
