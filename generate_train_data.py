@@ -9,9 +9,11 @@ import json
 from tqdm import tqdm
 from hendryck_cleanup import is_equiv
 import argparse
-from utils import ag_step,extract_answer,get_model_name,get_prompt
+from utils import ag_step,extract_answer,get_model_name,get_prompt, intelligent_split
 import time
 import math
+from typing import List, Dict
+from verify_final_answer import grade_answer
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -118,6 +120,7 @@ class generate_prm_data:
         self.low_level=args.low_level
         self.use_adaptive_binary=args.use_adaptive_binary
         self.sequential_search=args.sequential_search
+        self.nb_keywords=args.nb_keywords
 
     def load_data(data_dir):
         data=[]
@@ -162,16 +165,19 @@ class generate_prm_data:
             if self.start<=i<self.end:
                 question=data["question"]
                 answer=data["ground_truth"]
+                letter = data["letter"]
+                dataset = data["dataset"]
                 solutions=data["solutions"]
-                step_node=ag_step(question=question,previous_steps="",ans=answer)
+                generator_name = data["generator"]
+                step_node=ag_step(question=question,previous_steps="",ans=answer, letter=letter, dataset=dataset)
                 if static_sample:
                     sample_num_n=48
-                    sloved_list,perplexity_list,generate_tokens,_=self.verify_step(step_node,llm_list,tokenizer_list,sample_num_n,history)
+                    sloved_list,perplexity_list,generate_tokens,_=self.verify_step(step_node,llm_list,tokenizer_list,sample_num_n,history,generator_name)
                     total_sampled+=sample_num_n
                     total_sample_tokens+=generate_tokens
                 else:
                     sample_num_n=72
-                    sloved_list,perplexity_list,generate_tokens,generate_nodes=self.verify_step(step_node,llm_list,tokenizer_list,sample_num_n,history)
+                    sloved_list,perplexity_list,generate_tokens,generate_nodes=self.verify_step(step_node,llm_list,tokenizer_list,sample_num_n,history, generator_name)
                     total_sampled+=sample_num_n
                     total_sample_tokens+=generate_tokens
                     if sum(sloved_list)<=10:
@@ -187,12 +193,12 @@ class generate_prm_data:
                             sample_num_n=math.ceil(i/8)*8
                             sample_num_n=max(16,sample_num_n)
                             break
-                    sloved_list,perplexity_list,generate_tokens,_=self.verify_step(step_node,llm_list,tokenizer_list,sample_num_n,history)
+                    sloved_list,perplexity_list,generate_tokens,_=self.verify_step(step_node,llm_list,tokenizer_list,sample_num_n,history, generator_name)
                     total_sampled+=sample_num_n
                     total_sample_tokens+=generate_tokens
                 print(f"sampling {sample_num_n} candidates")
                 for solution in tqdm(solutions,total=len(solutions),desc="Solution process"):
-                    step_list=solution["solution"].split("Step")
+                    step_list = intelligent_split(solution["solution"], self.nb_keywords, False)
                     step_list=step_list[1:] if step_list[0]=="" else step_list
                     final_data={"problem":question,"ground_truth_answer":answer,"total_steps":len(step_list),"llama3.1_sloved_perplexity":perplexity_list[0],"qwen2_sloved_perplexity":perplexity_list[1],"sample_num":sample_num_n}
                     total_steps+=len(step_list)
@@ -200,27 +206,27 @@ class generate_prm_data:
                     step_node_list=[]
                     final_sloved_perplexity_list=[[] for _ in range(len(step_list))]
                     for step_indx in range(len(step_list)-1):
-                        previous_steps+="Step"+step_list[step_indx] if step_list[step_indx] else ""+step_list[step_indx]
+                        previous_steps+=step_list[step_indx] if step_list[step_indx] else ""+step_list[step_indx]
                         step_node_list.append(ag_step(question=final_data["problem"],previous_steps=previous_steps,ans=final_data["ground_truth_answer"]))
                     previous_steps=""
                     if not solution["label"]:
-                        first_error_step,sloved_perplexity_list,sampled,generate_tokens=self.find_error_step(final_data,0,len(step_node_list)-1,step_node_list,llm_list,tokenizer_list,sample_num_n,history,final_sloved_perplexity_list)
+                        first_error_step,sloved_perplexity_list,sampled,generate_tokens=self.find_error_step(final_data,0,len(step_node_list)-1,step_node_list,llm_list,tokenizer_list,sample_num_n,history,final_sloved_perplexity_list, generator_name)
                         total_sampled+=sampled
                         total_sample_tokens+=generate_tokens
                         final_data["final_sloved_perplexity_list"]=sloved_perplexity_list
                     for indx,step in enumerate(step_list):
                         final_data[f"state{indx}"]="Problem:"+final_data["problem"]+"\nSelected steps:\n"+previous_steps
                         if indx==len(step_list)-1:
-                            final_data[f"step{indx}"]=[{"text":"Step"+step,"rating":solution["label"]}]
+                            final_data[f"step{indx}"]=[{"text":step,"rating":solution["label"]}]
                             continue
-                        previous_steps+="Step"+step if step else ""+step
+                        previous_steps+=step if step else ""+step
                         if solution["label"]:
-                            final_data[f"step{indx}"]=[{"text":"Step"+step,"rating":solution["label"]}]
+                            final_data[f"step{indx}"]=[{"text":step,"rating":solution["label"]}]
                         else:
                             if indx>=first_error_step:
-                                final_data[f"step{indx}"]=[{"text":"Step"+step,"rating":0}] if indx==first_error_step else [{"text":"Step"+step,"rating":0}]
+                                final_data[f"step{indx}"]=[{"text":step,"rating":0}] if indx==first_error_step else [{"text":step,"rating":0}]
                             else:
-                                final_data[f"step{indx}"]=[{"text":"Step"+step,"rating":1}]
+                                final_data[f"step{indx}"]=[{"text":step,"rating":1}]
                     finish_time=time.time()
                     with open(self.save_dir,"a") as file:
                         file.write(json.dumps(final_data) + '\n')
@@ -228,7 +234,7 @@ class generate_prm_data:
         print(f"Search algorithm:{mode}, total number of generated tokens:{total_sample_tokens}, total number of samples:{total_sampled}, duration:{finish_time-start_time}\n")
 
 
-    def find_error_step(self,final_data,left,right,step_node_list,llm_list,tokenizer_list,sample_num_n,history,final_sloved_perplexity_list):
+    def find_error_step(self,final_data,left,right,step_node_list,llm_list,tokenizer_list,sample_num_n,history,final_sloved_perplexity_list, generator_name):
         c=0
         sloved_perplexity=final_data["llama3.1_sloved_perplexity"]+final_data["qwen2_sloved_perplexity"]
         acc_threshold=sloved_perplexity/2
@@ -237,7 +243,7 @@ class generate_prm_data:
         if self.sequential_search:
             left=len(step_node_list)
             for i in range(len(step_node_list)):
-                _,sloved_perplexity_list,generate_tokens,_=self.verify_step(step_node_list[i],llm_list,tokenizer_list,sample_num_n,history)
+                _,sloved_perplexity_list,generate_tokens,_=self.verify_step(step_node_list[i],llm_list,tokenizer_list,sample_num_n,history, generator_name)
                 total_sampled+=sample_num_n
                 total_sample_tokens+=generate_tokens
                 final_sloved_perplexity_list[i]=sloved_perplexity_list
@@ -257,7 +263,7 @@ class generate_prm_data:
                         mid-=right//4
                     elif sloved_rating>=5:
                         mid+=right//4
-                _,sloved_perplexity_list,generate_tokens,_=self.verify_step(step_node_list[mid],llm_list,tokenizer_list,sample_num_n,history)
+                _,sloved_perplexity_list,generate_tokens,_=self.verify_step(step_node_list[mid],llm_list,tokenizer_list,sample_num_n,history, generator_name)
                 total_sampled+=sample_num_n
                 total_sample_tokens+=generate_tokens
                 final_sloved_perplexity_list[mid]=sloved_perplexity_list
@@ -272,15 +278,15 @@ class generate_prm_data:
             return left,final_sloved_perplexity_list,total_sampled,total_sample_tokens
 
 
-    def verify_step(self,node,llm_list,tokenizer_list,sample_num,history):
-        acc_list,acc_perplexity_list=[],[],[]
+    def verify_step(self,node:List[ag_step],llm_list:List[LLM],tokenizer_list:List[AutoTokenizer],sample_num:int,history, generator_name:str):
+        acc_list,acc_perplexity_list=[],[]
         return_nodes=[]
         for i in range(len(llm_list)):
             generate_prompt = get_prompt(node,history, generator_name) if len(history)>1 else None
             generate_node=generate_numi_steps_test(node, tokenizer_list[i], llm_list[i], sample_num, -10, temperature=0.8, top_p=1,ori_prompt=generate_prompt,max_tokens=4000)
             acc,acc_prob_n,prob_sum_n,generate_tokens=0,0,0,0
             for gen_node in generate_node:
-                if eval_answer(gen_node.cur_step,gen_node.ans):
+                if grade_answer(gen_node.cur_step,gen_node.ans, gen_node.letter, gen_node.dataset):
                     gen_node.correct=True
                     acc+=1
                     acc_prob_n+=np.exp(gen_node.step_prob/gen_node.num_step_tokens[1])

@@ -17,6 +17,9 @@ class ag_step(BaseModel):
     previous_steps: str = ""
     value: Optional[float] = -100
     ans: str = ""
+    letter: str = ""
+    dataset: str = ""
+    generator: str = ""
     num_step_tokens:list[int]=[]
     step_prob:float=0
     q_value:Optional[float] = -100
@@ -226,3 +229,79 @@ def verify(question, verify_llm, verify_tokenizer, select_steps_list, next_steps
         output = verify_llm(**input_ids)
     pred = F.softmax(output.logits, dim=-1)
     return [float(pred[i][0]) for i in range(len(pred))]
+
+def contains_letters(separator:str)->bool:
+    intersection = set(string.ascii_letters).intersection(set(separator))
+    if len(intersection)>0:
+        return True
+    return False
+
+def intelligent_split(lcot:str, n_first:int, fusion:bool=False)->List[str]:
+    first_words = {}
+    raw_steps = lcot.split("\n\n")
+    for raw_step in raw_steps:
+        words = raw_step.split(' ')
+        if contains_letters(words[0]):
+            fw = words[0].replace(',','')
+            if fw.strip()=="I":
+                fw = r'[\.;:\?\!\n]\s+I'
+            if fw not in first_words:
+                first_words[fw] = 0
+            first_words[fw] += 1
+    sorted_words = [k for k,_ in sorted(first_words.items(), key=lambda item: item[1], reverse=True)]
+    keywords = sorted_words[:n_first]
+    augmented_keywords = []
+    for keyword in keywords:
+        augmented_keywords.append(re.escape(keyword+" "))
+        augmented_keywords.append(re.escape(keyword+","))
+    string = '|'.join(augmented_keywords)
+    steps = re.finditer(string,lcot)  # , flags=re.IGNORECASE
+    split_indices = []
+    for match in steps:
+        start = match.start()
+        if " I," in match.group() or " I " in match.group() or "\nI " in match.group() or "\nI," in match.group() and match.start()<len(string)-1:
+            start+=1
+        split_indices.append(start)
+    #split_indices = [match.start() for match in steps]
+    start_indices = [0]+split_indices[:-1]
+    end_indices = split_indices+[len(split_indices)]
+    all_indices = zip(start_indices,end_indices)
+    full_steps = []
+    current_step = ""
+    list_mid_sentence = [',',';',':']
+    for (i,j) in all_indices:
+        step = lcot[i:j]
+        if fusion:
+            if len(step.split(' '))<= 10 and len(step)>0 and len(full_steps)>0:
+                #print(f"Test print: {step}")
+                if step[-1].islower() or step[-1] in list_mid_sentence:
+                    current_step+=step
+                    
+                elif step[0].islower() or step[0] in list_mid_sentence:
+                    if current_step=="":
+                        full_steps[-1]+=step
+                    else:
+                        current_step+=step
+                else:
+                    if current_step=="":
+                        full_steps[-1]+=step
+                    else:
+                        current_step+=step
+                    #print(current_step)
+            elif len(step.split(' '))<= 10:
+                continue
+            elif len(step.split(' ')) > 200:
+                substeps = step.split("\n\n")
+                #print(f"Step too long. Substeps: {substeps}")
+                full_steps.extend(substeps)
+            else:
+                current_step+=step
+                full_steps.append(current_step)
+                current_step = ""
+            if current_step!="":
+                full_steps.append(current_step)
+        else:
+            if len(step)>0:
+                full_steps.append(step)
+    #print(f"When finishing intelligent_split, there are {len(full_steps)} steps.")
+    return full_steps
