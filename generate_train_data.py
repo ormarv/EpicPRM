@@ -168,7 +168,7 @@ class generate_prm_data:
                 letter = data["letter"]
                 dataset = data["dataset"]
                 solutions=data["solutions"]
-                generator_name = data["generator"]
+                generator_name = ""
                 step_node=ag_step(question=question,previous_steps="",ans=answer, letter=letter, dataset=dataset)
                 if static_sample:
                     sample_num_n=48
@@ -198,6 +198,7 @@ class generate_prm_data:
                     total_sample_tokens+=generate_tokens
                 print(f"sampling {sample_num_n} candidates")
                 for solution in tqdm(solutions,total=len(solutions),desc="Solution process"):
+                    generator_name = solution["generator"]
                     step_list = intelligent_split(solution["solution"], self.nb_keywords, False)
                     step_list=step_list[1:] if step_list[0]=="" else step_list
                     final_data={"problem":question,"ground_truth_answer":answer,"total_steps":len(step_list),"llama3.1_sloved_perplexity":perplexity_list[0],"qwen2_sloved_perplexity":perplexity_list[1],"sample_num":sample_num_n}
