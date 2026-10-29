@@ -158,8 +158,12 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
 
         # We get the contribution of each step
 
-        contribution_incorrect_step = incorrect_step_mc_ppl/question_mc_ppl
-        contribution_correct_step = correct_step_mc_ppl/question_mc_ppl
+        if question_mc_ppl > 0:
+            contribution_incorrect_step = incorrect_step_mc_ppl/question_mc_ppl
+            contribution_correct_step = correct_step_mc_ppl/question_mc_ppl
+        else:  #Unsure what else to do here.
+            contribution_incorrect_step = 0
+            contribution_correct_step = 0
 
 
 
