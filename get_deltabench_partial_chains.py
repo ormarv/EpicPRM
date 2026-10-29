@@ -86,7 +86,7 @@ llm_list = [LLM(
             tensor_parallel_size=1,
             trust_remote_code=True,
             gpu_memory_utilization=gpu_memory_utilization_list[i],
-            max_model_len=8192,
+            max_model_len=16384,
             swap_space=16,
             seed=69) for i in range(len(llm_dir_list))]
 
