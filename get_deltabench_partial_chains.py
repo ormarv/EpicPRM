@@ -8,7 +8,7 @@ from generate_train_data import generate_prm_data
 from utils import ag_step
 import numpy as np
 import itertools
-from typing import List, Dict, Any
+from typing import List, Dict, Any, cast
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from random import randint
@@ -102,7 +102,8 @@ gen_labels = []
 
 tokenizer_list = [AutoTokenizer.from_pretrained(model) for model in llm_dir_list]
 with open("clean_deltabench_samples.jsonl", "w+") as f:
-    for sample in tqdm(dataset):
+    for item in tqdm(dataset):
+        sample = cast(Dict[str, Any], item)
         print(f"sample: {sample}")
         subject = sample["task_l1"]
         if subject == "math" and len(scored_math_samples) >= 400:
@@ -151,7 +152,7 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
         correct_step_mc_ppl = sum(correct_step_perplexity_list) 
 
         # We get the perplexity score of the question
-        _, perplexity_list, _, _ = generate_prm_data_object.verify_step(step, llm_list, tokenizer_list, sample_num_n, "", "")
+        _, perplexity_list, _, _ = generate_prm_data_object.verify_step(first_step, llm_list, tokenizer_list, sample_num_n, "", "")
 
         question_mc_ppl = sum(perplexity_list)
 
