@@ -29,6 +29,7 @@ def parse_args():
     parser.add_argument("--low_level", action= "store_true")
     parser.add_argument("--use_adaptive_binary", action= "store_true")
     parser.add_argument("--sequential_search", action= "store_true")
+    parser.add_argument("--nb_keywords", type=int, default=8)
     return parser.parse_args()
 
 
