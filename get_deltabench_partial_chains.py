@@ -113,36 +113,45 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
             continue
         elif subject == "Physics&Chemistry&Biology" and len(scored_physchem_samples) >= 400:
             continue
-        clean_sample = {"id":sample["id"], "subject": subject, "question": sample["question"], "gold_answer": sample["answer"]}
+        gold_answer = sample["answer"] if sample["answer"] else sample["solution"]
+        clean_sample = {"id":sample["id"], "subject": subject, "question": sample["question"], "gold_answer": gold_answer}
         sections_list = re.split(r"section[0-9]: ",sample["sections_content"])
         full_reasoning = "".join(sections_list)
         steps_list = full_reasoning.split("\n\n")
-        error_step = re.compile(r"'error_step': ([0-9]+)").search(sample["sections_labeled_info"]).group(1)  #there is only one error_step given for each LCoT
+        error_step_raw = re.compile(r"'error_step': ([0-9]+)").search(sample["sections_labeled_info"])
+        if error_step_raw:
+            error_step = error_step_raw.group(1)
+        else:
+            raise Exception(f"Did not find an error step in {sample["sections_labeled_info"]}.")
+
         clean_sample["steps"] = steps_list
         clean_sample["error_step"] = error_step
         if subject == "math":
             ds = "math"
+        elif "gpqa" in sample["origin"].lower() or "agieval" in sample["origin"].lower():
+            ds = "gpqa"
+            gold_answer = gold_answer.split("\\boxed{")[1].split("}")[0] if "\\boxed{" in gold_answer else gold_answer
         else:
             ds = "deltabench"
 
         sample_num_n = 2
         # When creating the ag_step for the question, only the question is given, no current step.
-        first_step = ag_step(question=clean_sample["question"], ans=clean_sample["gold_answer"], letter="", dataset=ds, previous_steps="")
+        first_step = ag_step(question=clean_sample["question"], ans=gold_answer, dataset=ds, previous_steps="")
 
         # Now we sample the index of our incorrect step, create the corresponding node, and get its perplexity score
         incorrect_step_index = randint(int(error_step), len(steps_list)-1)
-        incorrect_step = ag_step(question=clean_sample["question"], ans=clean_sample["gold_answer"], letter="", dataset=ds, previous_steps="\n\n".join(steps_list[:incorrect_step_index]), cur_step = steps_list[incorrect_step_index])
+        incorrect_step = ag_step(question=clean_sample["question"], ans=gold_answer, dataset=ds, previous_steps="\n\n".join(steps_list[:incorrect_step_index]), cur_step = steps_list[incorrect_step_index])
         _, incorrect_step_perplexity_list, _, _ = generate_prm_data_object.verify_step(incorrect_step, llm_list, tokenizer_list, sample_num_n, "", "")
         incorrect_step_mc_ppl = sum(incorrect_step_perplexity_list)
 
         # and the index of our correct step
         correct_step_index = randint(0, int(error_step)-1)
-        correct_step = ag_step(question=clean_sample["question"], ans=clean_sample["gold_answer"], letter="", dataset=ds, previous_steps="\n\n".join(steps_list[:correct_step_index]), cur_step = steps_list[correct_step_index])
+        correct_step = ag_step(question=clean_sample["question"], ans=gold_answer, dataset=ds, previous_steps="\n\n".join(steps_list[:correct_step_index]), cur_step = steps_list[correct_step_index])
         _, correct_step_perplexity_list, _, _ = generate_prm_data_object.verify_step(correct_step, llm_list, tokenizer_list, sample_num_n, "", "")
         correct_step_mc_ppl = sum(correct_step_perplexity_list) 
 
         # We get the perplexity score of the question
-        _, perplexity_list, _, _ = generate_prm_training_data_object.verify_step(step, llm_list, tokenizer_list, sample_num_n, "", "")
+        _, perplexity_list, _, _ = generate_prm_data_object.verify_step(step, llm_list, tokenizer_list, sample_num_n, "", "")
 
         question_mc_ppl = sum(perplexity_list)
 

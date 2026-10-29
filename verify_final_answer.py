@@ -1,7 +1,5 @@
 import re
 from hendryck_cleanup import *
-from lcb_runner.evaluation.testing_util import run_test
-from lcb_runner.utils.extraction_utils import extract_test_output_code
 import multiprocessing as mp
 import tempfile
 import os
@@ -67,65 +65,7 @@ def grade_math(answer:str, gold_standard:str):
     print(f"Gold: {gold_standard}")
     return equiv
 
-def worker(queue, samp, test_code, temp_dir):
-    try:
-        os.chdir(temp_dir)
-        results, metadata = run_test(samp, test=test_code)
-        queue.put((results, metadata))
-    except Exception as e:
-        queue.put(([False], str(e)))
 
-def run_test_isolated(sample, code, timeout=6):
-    context = mp.get_context("spawn")
-
-    q = context.Queue()
-    temp_dir = tempfile.mkdtemp()
-    p = context.Process(target=worker, args=(q, sample, code, temp_dir))
-    p.start()
-    p.join(timeout=timeout)
-
-    if p.is_alive():
-        p.terminate()
-        p.join()
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        return [False], {"error":"Timeout or Infinite Loop"}
-    
-    if not q.empty():
-        return q.get()
-    else:
-        return [False], {"error":"Process crashed silently"}
-
-def grade_lcb(answer:str, sample):
-    code = extract_test_output_code(answer)
-    # Now we get the private test cases from the encrypted string
-    inputs = []
-    outputs = []
-    decoded_bytes = base64.b64decode(sample["ptc"])
-    decompressed_bytes = zlib.decompress(decoded_bytes)
-    readable_cases = pickle.loads(decompressed_bytes)
-    ptc = json.loads(readable_cases)
-    for x in ptc:
-        if len(x)>0:
-            inputs.append(x["input"])
-            outputs.append(x["output"])
-        else:
-            print(f"Empty x: {x}")
-            continue
-    s = {'input_output':json.dumps({'inputs':inputs, 'outputs':outputs, 'fn_name':sample["fn_name"]})}
-    print(f"Code: {code}\n")
-    if not code:
-        print(f"No code found.")
-        return False
-    #str_sample = json.dumps(sample)
-    results, metadata = run_test_isolated(s, code)
-    print(f"Results: {results}, Metadata: {metadata}")
-    # Let's assume that results is a list of bools
-    if not results:
-        return False
-    for result in results:
-        if result is not True:
-            return False
-    return True
 
 def grade_deltabench_code(solution:str, lcot:str, llm):
     # extract code from lcot
@@ -140,16 +80,47 @@ def grade_deltabench_code(solution:str, lcot:str, llm):
         ast.parse(extracted_code)
         prompt = f"""You are an expert code evaluator. Compare the Reference Solution with the model's generated Long Chain-of-Thought (LCoT) and extracted code to determine if the final answer is functionally correct.
 
+        Reference Solution:
+        {solution}
+
+        Model's Long Chain-of-Thought (LCoT):
+        {lcot}
+
+        Extracted Code:
+        {extracted_code}
+
+        Evaluate whether the model's solution correctly solves the problem with equivalent logic to the reference solution.
+        You must respond strictly in the following format:
+        VERDICT: YES
+        REASON: [brief explanation]
+
+        OR
+
+        VERDICT: NO
+        REASON: [brief explanation]
+        """
+        sampling_params = SamplingParams(temperature=0.0, max_tokens=256)
+        outputs = llm.generate([prompt], sampling_params)
+        response_text = outputs[0].outputs[0].text.strip()
+        if "verdict: yes" in response_text.lower():
+            return True
+        else:
+            return False
+    except:
+        print(f"Failed AST syntax check.")
+        return False
+
+def judge_deltabench_reasoning(solution:str, last_reasoning_section:str, llm)->bool:
+    prompt = f"""You are an expert evaluator. Compare the Reference Solution with the model's final answer (provided in the final section of its reasoning trace) to determine if the final conclusion is correct.
+
 Reference Solution:
 {solution}
 
-Model's Long Chain-of-Thought (LCoT):
-{lcot}
+Model's Final Answer / Last Section:
+{last_reasoning_section}
 
-Extracted Code:
-{extracted_code}
+Evaluate whether the model's final answer matches or is logically equivalent to the reference solution. Minor formatting or notation differences are acceptable, but the core conclusion/value must be correct.
 
-Evaluate whether the model's solution correctly solves the problem with equivalent logic to the reference solution.
 You must respond strictly in the following format:
 VERDICT: YES
 REASON: [brief explanation]
@@ -166,23 +137,16 @@ REASON: [brief explanation]
         return True
     else:
         return False
-    except:
-        print(f"Failed AST syntax check.")
-        return False
 
-def judge_deltabench_reasoning(solution:str, last_reasoning_section:str, llm)->bool:
-    prompt = 
-    
-
-def grade_answer(answer:str, gold_standard:str|dict|None, letter:str|None, dataset:str, llm)->bool:
+def grade_answer(answer:str, gold_standard:str, dataset:str, llm)->bool:
     if dataset in ["gpqa", "mmlu"]:
-        label = string_matching(answer, letter)
+        label = string_matching(answer, gold_standard)
     elif dataset == "math":
         label = grade_math(answer, gold_standard)
-    elif dataset == "deltabench":
+    elif dataset == "deltabench_mcq":
         label = answer_matching(answer, gold_standard)
     elif dataset == "deltabench_code":
         label = grade_deltabench_code(gold_standard, answer, llm)
-    else:  # LCB
-        label = grade_lcb(answer, gold_standard)  # The private test cases are in the gold standard.
+    else:  # LLM-as-a-Judge
+        label = judge_deltabench_reasoning(gold_standard, answer, llm)
     return label

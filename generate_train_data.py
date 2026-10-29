@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import numpy as np
-from sympy import *
 from vllm import LLM, SamplingParams
 from statistics import mean
 import random
@@ -123,7 +122,7 @@ class generate_prm_data:
         self.sequential_search=args.sequential_search
         self.nb_keywords=args.nb_keywords
 
-    def load_data(data_dir):
+    def load_data(self,data_dir):
         data=[]
         with open(data_dir,"r") as f:
             for line in f:
@@ -288,7 +287,7 @@ class generate_prm_data:
             generate_node=generate_numi_steps_test(node, tokenizer_list[i], llm_list[i], sample_num, -10, temperature=0.8, top_p=1,ori_prompt=generate_prompt,max_tokens=4000)
             acc,acc_prob_n,prob_sum_n,generate_tokens=0,0,0,0
             for gen_node in generate_node:
-                if grade_answer(gen_node.cur_step,gen_node.ans, gen_node.letter, gen_node.dataset):
+                if grade_answer(gen_node.cur_step,gen_node.ans, gen_node.dataset, llm_list[i]):
                     gen_node.correct=True
                     acc+=1
                     acc_prob_n+=np.exp(gen_node.step_prob/gen_node.num_step_tokens[1])
