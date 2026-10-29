@@ -119,11 +119,12 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
         sections_list = re.split(r"section[0-9]: ",sample["sections_content"])
         full_reasoning = "".join(sections_list)
         steps_list = full_reasoning.split("\n\n")
-        error_step_raw = re.compile(r"'error_step': ([0-9]+)").search(sample["sections_labeled_info"])
+        error_step_raw = re.compile(r"'error_step': [a-zA-Z]*([0-9]+)").search(sample["sections_labeled_info"])
         if error_step_raw:
-            error_step = error_step_raw.group(1)
+            error_step = int(error_step_raw.group(1))-1
         else:
-            raise Exception(f"Did not find an error step in {sample["sections_labeled_info"]}.")
+            print(f"Did not find an error step in {sample["sections_labeled_info"]}.")
+            continue
 
         clean_sample["steps"] = steps_list
         clean_sample["error_step"] = error_step
@@ -140,18 +141,18 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
         first_step = ag_step(question=clean_sample["question"], ans=gold_answer, dataset=ds, previous_steps="")
 
         # Now we sample the index of our incorrect step, create the corresponding node, and get its perplexity score
-        if int(error_step)-1 < len(steps_list)-1:
-            incorrect_step_index = randint(int(error_step)-1, len(steps_list)-1)
-        elif int(error_step)-1 == len(steps_list)-1:
-            incorrect_step_index = int(error_step)-1
+        if error_step < len(steps_list)-1:
+            incorrect_step_index = randint(error_step, len(steps_list)-1)
+        elif error_step == len(steps_list)-1:
+            incorrect_step_index = error_step
         else:
-            raise Exception(f"The error_step {int(error_step)-1} is higher than the last step {len(steps_list)-1}.")
+            raise Exception(f"The error_step {error_step} is higher than the last step {len(steps_list)-1}.")
         incorrect_step = ag_step(question=clean_sample["question"], ans=gold_answer, dataset=ds, previous_steps="\n\n".join(steps_list[:incorrect_step_index]), cur_step = steps_list[incorrect_step_index])
         _, incorrect_step_perplexity_list, _, _ = generate_prm_data_object.verify_step(incorrect_step, llm_list, tokenizer_list, sample_num_n, "", "")
         incorrect_step_mc_ppl = sum(incorrect_step_perplexity_list)
 
         # and the index of our correct step
-        correct_step_index = randint(0, int(error_step)-1)
+        correct_step_index = randint(0, error_step)
         correct_step = ag_step(question=clean_sample["question"], ans=gold_answer, dataset=ds, previous_steps="\n\n".join(steps_list[:correct_step_index]), cur_step = steps_list[correct_step_index])
         _, correct_step_perplexity_list, _, _ = generate_prm_data_object.verify_step(correct_step, llm_list, tokenizer_list, sample_num_n, "", "")
         correct_step_mc_ppl = sum(correct_step_perplexity_list) 
