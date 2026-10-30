@@ -106,7 +106,6 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
     for item in tqdm(dataset):
         if i>= 20:
             break
-        i+=1
         sample = cast(Dict[str, Any], item)
         print(f"sample: {sample}")
         subject = sample["task_l1"]
@@ -118,6 +117,7 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
             continue
         elif subject == "Physics&Chemistry&Biology" and len(scored_physchem_samples) >= 400:
             continue
+        i+=1
         gold_answer = sample["answer"] if sample["answer"] else sample["solution"]
         clean_sample = {"id":sample["id"], "subject": subject, "question": sample["question"], "gold_answer": gold_answer}
         sections_list = re.split(r"section[0-9]: ",sample["sections_content"])
