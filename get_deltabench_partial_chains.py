@@ -110,7 +110,7 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
         sample = cast(Dict[str, Any], item)
         print(f"sample: {sample}")
         subject = sample["task_l1"]
-        if subject == "math" and len(scored_math_samples) >= 400:
+        if subject == "math":  # and len(scored_math_samples) >= 400:
             continue
         elif subject == "code" and len(scored_code_samples) >= 400:
             continue
