@@ -98,7 +98,7 @@ def generate_numi_steps_test(node, generate_tokenizer, generate_llm, test_n, num
             except IndexError:
                 print(f"IndexError with idx {idx} and outputs {output.outputs} of length {len(output.outputs)}.")
                 continue
-            if len(text)<10:
+            if len(text)<5:
                 print(f"{text} is too short.")
                 continue
             outputs_text.append(text.strip())
