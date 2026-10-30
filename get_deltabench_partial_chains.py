@@ -101,8 +101,12 @@ physchem_labels = []
 gen_labels = []
 
 tokenizer_list = [AutoTokenizer.from_pretrained(model) for model in llm_dir_list]
+i = 0
 with open("clean_deltabench_samples.jsonl", "w+") as f:
     for item in tqdm(dataset):
+        if i>= 20:
+            break
+        i+=1
         sample = cast(Dict[str, Any], item)
         print(f"sample: {sample}")
         subject = sample["task_l1"]
