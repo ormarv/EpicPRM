@@ -140,7 +140,7 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
         else:
             ds = "deltabench"
 
-        sample_num_n = 2
+        sample_num_n = 16
         # When creating the ag_step for the question, only the question is given, no current step.
         first_step = ag_step(question=clean_sample["question"], ans=gold_answer, dataset=ds, previous_steps="")
 
