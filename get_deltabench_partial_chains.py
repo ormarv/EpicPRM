@@ -113,7 +113,7 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
             continue
         elif subject == "code" and len(scored_code_samples) >= 400:
             continue
-        elif subject == "general" and len(scored_gen_samples) >= 400:
+        elif subject == "general":  # and len(scored_gen_samples) >= 400:
             continue
         elif subject == "Physics&Chemistry&Biology" and len(scored_physchem_samples) >= 400:
             continue
