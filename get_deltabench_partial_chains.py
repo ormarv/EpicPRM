@@ -115,7 +115,7 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
             continue
         elif subject == "general":  # and len(scored_gen_samples) >= 400:
             continue
-        elif subject == "Physics&Chemistry&Biology" and len(scored_physchem_samples) >= 400:
+        elif subject == "Physics&Chemistry&Biology":  # and len(scored_physchem_samples) >= 400:
             continue
         i+=1
         gold_answer = sample["answer"] if sample["answer"] else sample["solution"]
