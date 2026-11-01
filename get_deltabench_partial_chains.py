@@ -107,7 +107,6 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
         if i>= 20:
             break
         sample = cast(Dict[str, Any], item)
-        print(f"sample: {sample}")
         subject = sample["task_l1"]
         if subject == "math":  # and len(scored_math_samples) >= 400:
             continue
@@ -118,7 +117,11 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
         elif subject == "Physics&Chemistry&Biology":  # and len(scored_physchem_samples) >= 400:
             continue
         i+=1
+        print(f"sample: {sample}")
         gold_answer = sample["answer"] if sample["answer"] else sample["solution"]
+        if not gold_answer:
+            print(f"Both the answer and solution fields are empty.")
+            gold_answer = ""
         clean_sample = {"id":sample["id"], "subject": subject, "question": sample["question"], "gold_answer": gold_answer}
         sections_list = re.split(r"section[0-9]: ",sample["sections_content"])
         full_reasoning = "".join(sections_list)
@@ -134,6 +137,8 @@ with open("clean_deltabench_samples.jsonl", "w+") as f:
         clean_sample["error_step"] = error_step
         if subject == "math":
             ds = "math"
+        elif subject == "code":
+            ds = "deltabench_code"
         elif "gpqa" in sample["origin"].lower() or "agieval" in sample["origin"].lower():
             ds = "gpqa"
             gold_answer = gold_answer.split("\\boxed{")[1].split("}")[0] if "\\boxed{" in gold_answer else gold_answer
