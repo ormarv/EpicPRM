@@ -21,7 +21,7 @@ module load cuda/12.6.3
 conda activate baselinesenv
 export LD_LIBRARY_PATH=/linkhome/rech/genltc01/ugy38tw/.local/lib/python3.12/site-packages/nvidia/cusparselt/lib:$LD_LIBRARY_PATH
 
-chmod +x get_deltabench_partial_chains.py 
-srun get_deltabench_partial_chains.py
+chmod +x count_deltabenc_steps.py 
+srun count_deltabenc_steps.py
 
 echo "Job ended at: $(date)"
